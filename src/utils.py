@@ -40,7 +40,7 @@ def split_to_batches(*inputs_list, batch_size: int, dim=0):
         if is_namedtuple:
             tmp = {}
             for k, v in inputs._asdict().items():
-                tmp[k] = split_to_batches(v, batch_size, dim)
+                tmp[k] = split_to_batches(v, batch_size=batch_size, dim=dim)
 
             ret = []
             for i in range(len(tmp[k])):
@@ -50,7 +50,7 @@ def split_to_batches(*inputs_list, batch_size: int, dim=0):
         if isinstance(inputs, tuple):
             tmp = []
             for x in inputs:
-                tmp.append(split_to_batches(x, batch_size, dim))
+                tmp.append(split_to_batches(x, batch_size=batch_size, dim=dim))
             return list(zip(*tmp))
 
         else:
