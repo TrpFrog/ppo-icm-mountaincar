@@ -60,10 +60,11 @@ class PPOActorCritic(nn.Module, metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def act(self, state: Tensor) -> SelectedAction:
+    def act(self, state: Tensor, greedy: bool = False) -> SelectedAction:
         """
         Get action from policy
         :param state: current state
+        :param greedy: if True, get greedy action
         :return: Tuple of action and log probability of action
         """
         raise NotImplementedError
@@ -128,9 +129,17 @@ class DiscretePPOActorCritic(PPOActorCritic):
         assert self.critic(x).shape == (batch_size, 1)
 
     # select action
-    def act(self, state: Tensor) -> SelectedAction:
+    def act(self, state: Tensor, greedy=False) -> SelectedAction:
         # Select action from Categorical distribution
         action_logits = self.actor(state)
+
+        if greedy:
+            action = torch.argmax(action_logits, dim=1)
+            action_log_prob = torch.zeros_like(action)
+            return SelectedAction(
+                action=action.detach(),
+                log_prob=action_log_prob.detach()
+            )
 
         # print(action_probs)
         dist = torch.distributions.Categorical(logits=action_logits)
@@ -201,10 +210,18 @@ class ContinuousPPOActorCritic(PPOActorCritic):
             new_action_std ** 2
         ).to(device)
 
-    def act(self, state: Tensor) -> SelectedAction:
+    def act(self, state: Tensor, greedy: bool = False) -> SelectedAction:
         action_mean = self.actor(state).softmax(dim=-1)
         cov_mat = torch.diag(self.action_var).unsqueeze(dim=0)
         dist = torch.distributions.MultivariateNormal(action_mean, cov_mat)
+
+        if greedy:
+            action = action_mean
+            action_log_prob = torch.zeros_like(action)
+            return SelectedAction(
+                action=action.detach(),
+                log_prob=action_log_prob.detach()
+            )
 
         action = dist.sample()
         action_log_prob = dist.log_prob(action)

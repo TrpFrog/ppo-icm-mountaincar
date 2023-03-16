@@ -3,7 +3,7 @@ from torch import Tensor
 
 
 def get_device():
-    return 'cuda' if torch.cuda.is_available() else 'cpu'
+    # return 'cuda' if torch.cuda.is_available() else 'cpu'
     if torch.backends.mps.is_available():
         return 'mps'
     else:

@@ -2,8 +2,10 @@ import dataclasses
 
 import gym
 import numpy as np
+import typing
 import wandb
 import torch
+from tqdm import trange
 
 from src.config import Config
 from src.icm import DiscreteICM
@@ -17,8 +19,10 @@ def train(config: Config):
     render_mode = 'rgb_array' if config.render else None
     with gym.make(config.env, render_mode=render_mode) as env:
 
-        episodes = 10000
-        max_every_step = 1000
+        episodes = config.max_episodes
+        max_every_step = config.max_episode_length
+        if max_every_step <= 0:
+            max_every_step = env.spec.max_episode_steps
 
         agent_params = DiscretePPO.Params(
             gamma_discount=config.gamma,
@@ -44,6 +48,7 @@ def train(config: Config):
             print('Curiosity disabled')
 
         agent = DiscretePPO(params=agent_params, curiosity=curiosity).to(device)
+        agent = typing.cast(DiscretePPO, torch.compile(agent))
 
         wandb_config = dataclasses.asdict(agent_params)
         wandb_config.update({
@@ -56,43 +61,47 @@ def train(config: Config):
             config=wandb_config
         )
 
-        for i in range(episodes):
-            obs, info = env.reset()
+        try:
+            for i in range(episodes):
+                obs, info = env.reset()
 
-            for t in range(max_every_step):
-                if config.render:
-                    env.render()
-                # convert obs to tensor
-                obs = torch.from_numpy(obs).float().to(device)
-                action = agent.select_action(obs)
+                for t in trange(max_every_step, desc=f'Playing episode {i}'):
+                    if config.render:
+                        env.render()
+                    # convert obs to tensor
+                    obs = torch.from_numpy(obs).float().to(device)
+                    action = agent.select_action(obs)
 
-                obs, reward, terminated, truncated, info = env.step(action)
-                agent.record_step(
-                    reward=reward,
-                    next_state=torch.from_numpy(obs).float().to(device),
-                    is_terminal=terminated
-                )
+                    obs, reward, terminated, truncated, info = env.step(action)
+                    agent.record_step(
+                        reward=reward,
+                        next_state=torch.from_numpy(obs).float().to(device),
+                        is_terminal=terminated
+                    )
 
-                done = terminated or truncated
+                    done = terminated or t == max_every_step - 1
+                    if config.max_episode_length is None:
+                        done = done or truncated
 
-                if done:
-                    break
+                    if done:
+                        break
 
-            reward_sum = np.sum(agent.buffer.rewards[-(t + 1):])
+                reward_sum = np.sum(agent.buffer.rewards[-(t + 1):])
 
-            if config.env == 'MountainCar-v0':
-                max_x, max_v = torch.stack(agent.buffer.states[-(t + 1):], dim=0).max(dim=0).values
-                max_v, max_x = max_v.item(), max_x.item()
-                print(f'{max_v = :.2f} {max_x = :.2f}')
+                if config.env == 'MountainCar-v0':
+                    max_x, max_v = torch.stack(agent.buffer.states[-(t + 1):], dim=0).max(dim=0).values
+                    max_v, max_x = max_v.item(), max_x.item()
+                    print(f'{max_v = :.2f} {max_x = :.2f}')
 
-            if len(agent.buffer.rewards) > config.buffer_update_size:
-                info = agent.update()
+                if len(agent.buffer.rewards) > config.buffer_update_size:
+                    info = agent.update()
 
-            info.update({'reward_sum': reward_sum})
-            print(info)
+                info.update({'reward_sum': reward_sum})
+                print(info)
 
-            wandb.log(info)
-            print(f'Episode {i} finished after {t + 1} time steps')
+                wandb.log(info)
+                print(f'Episode {i} finished after {t + 1} time steps')
+        finally:
+            # save parameters
+            torch.save(agent.state_dict(), 'ppo_discrete.pth')
 
-    # save parameters
-    torch.save(agent.state_dict(), 'ppo_discrete.pth')

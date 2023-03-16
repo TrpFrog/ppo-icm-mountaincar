@@ -1,3 +1,5 @@
+from typing import Optional
+
 import classopt
 
 
@@ -7,9 +9,12 @@ class Config:
     train: bool = False
     test: bool = False
     render: bool = False
+    cpu: bool = False
 
     env: str = 'MountainCar-v0'
     disable_curiosity: bool = False
+    max_episodes: int = 10000
+    max_episode_length: int = 200
 
     # hyperparameters
     gamma: float = 0.99

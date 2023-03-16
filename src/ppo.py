@@ -42,11 +42,16 @@ class RolloutBuffer:
 
 
 class PPOLoss(nn.Module):
-    def __init__(self, eps_clip=0.2, reduction: str = 'mean'):
+    def __init__(self,
+                 eps_clip=0.2,
+                 c_entropy=0.01,
+                 c_value=0.5,
+                 reduction: str = 'mean'):
         super().__init__()
         self.mse_loss = nn.MSELoss(reduction=reduction)
-        self.cross_entropy_loss = nn.CrossEntropyLoss(reduction=reduction)
         self.reduction = reduction
+        self.c_entropy = c_entropy
+        self.c_value = c_value
         assert 0 <= eps_clip < 1
         self.eps_clip = eps_clip
 
@@ -58,10 +63,10 @@ class PPOLoss(nn.Module):
         return -torch.min(unclipped_advantage, clipped_advantage)
 
     def state_value_loss(self, state_value: Tensor, reward: Tensor) -> Tensor:
-        return 0.5 * self.mse_loss(state_value, reward)
+        return self.c_value * self.mse_loss(state_value, reward)
 
     def entropy_term(self, dist_entropy: Tensor) -> Tensor:
-        return -0.01 * dist_entropy
+        return -self.c_entropy * dist_entropy
 
     @staticmethod
     def _flatten_inputs(*x: Tensor) -> map:
@@ -104,9 +109,10 @@ class PPOLoss(nn.Module):
 
         L_reward = self.state_value_loss(state_value, discounted_reward_sum)
 
-        ratio = torch.exp(log_prob - old_log_prob)
-        advantage = discounted_reward_sum - state_value.detach()
-        L_clip = self.clip_loss(ratio, advantage)
+        L_clip = self.clip_loss(
+            ratio=torch.exp(log_prob - old_log_prob),
+            advantage=discounted_reward_sum - state_value.detach(),
+        )
 
         # PPO is on-policy type algorithm.
         # The following entropy term is added to this loss function
@@ -131,7 +137,6 @@ class PPO(nn.Module):
         reward_normalization: bool = False
         reward_scaling: bool = False
         evaluation_batch_size: Optional[int] = None
-        use_fp16: bool = False
 
     def __init__(self,
                  params: Params,
@@ -148,9 +153,6 @@ class PPO(nn.Module):
         self.curiosity = curiosity or NoCuriosity()
         self.ppo_loss = PPOLoss(eps_clip=params.eps_clip)
         self._policy = policy
-
-        if params.use_fp16:
-            print('Using FP16')
 
         if custom_optimizer is None:
             assert params.lr_actor is not None, \
@@ -250,6 +252,7 @@ class PPO(nn.Module):
         old_actions = detach_if_tensor(self.batchify_action_memory(self.buffer.actions))
         old_log_probs = detach_if_tensor(self.batchify_log_probs(self.buffer.log_probs))
 
+        # Batchify the data
         bs = self.params.evaluation_batch_size or old_actions.size(0)
         batched = utils.split_to_batches(
             old_states,
@@ -266,10 +269,13 @@ class PPO(nn.Module):
         total_reward = []
 
         # Optimize policy for K epochs
-        for _ in tqdm.trange(self.params.k_epochs, desc="Optimizing policy"):
-            for s_old, s_next_old, a_old, acc_reward, log_p_old in zip(*batched):
+        for epoch in tqdm.trange(self.params.k_epochs, desc="Optimizing policy", leave=False):
+            epoch_desc = f"Epoch {epoch}/{self.params.k_epochs}"
+            tqdm_iter = tqdm.tqdm(zip(*batched), total=len(batched[0]), desc=epoch_desc)
+            for s_old, s_next_old, a_old, acc_reward, log_p_old in tqdm_iter:
                 evaluated = self.policy.evaluate(s_old, a_old)
 
+                # Add curiosity reward to the accumulated reward
                 acc_reward_with_curiosity = self.curiosity.reward(
                     accum_reward=acc_reward,
                     state=s_old,
@@ -277,6 +283,7 @@ class PPO(nn.Module):
                     action=a_old,
                 )
 
+                # Calculate PPO loss
                 ppo_loss = self.ppo_loss(
                     old_log_prob=log_p_old,
                     log_prob=evaluated.action_log_probs,
@@ -285,6 +292,7 @@ class PPO(nn.Module):
                     dist_entropy=evaluated.dist_entropy,
                 )
 
+                # Calculate curiosity loss and add it to the PPO loss
                 loss = self.curiosity.loss(
                     policy_loss=ppo_loss,
                     state=s_old,
@@ -292,15 +300,17 @@ class PPO(nn.Module):
                     action=a_old,
                 )
 
+                # Optimize the policy
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
                 self.optimizer.step()
 
+                # Record loss for debugging
                 ppo_losses.append(ppo_loss.item())
                 if hasattr(self.curiosity, 'latest_info'):
                     curiosity_losses.append(self.curiosity.latest_info['loss'])
                     curiosity_reward.append(self.curiosity.latest_info['reward'])
-                total_reward.append(acc_reward_with_curiosity.mean())
+                total_reward.append(acc_reward_with_curiosity.mean().item())
 
         # clear buffer
         self.buffer.clear()
@@ -403,9 +413,9 @@ class DiscretePPO(PPO):
                          custom_optimizer=custom_optimizer,
                          curiosity=curiosity)
 
-    def select_action(self, state: Tensor) -> int:
+    def select_action(self, state: Tensor, greedy: bool = False) -> int:
         with torch.inference_mode():
-            selected_action = self.policy.act(state.unsqueeze(0))
+            selected_action = self.policy.act(state.unsqueeze(0), greedy=greedy)
 
         self.buffer.states.append(state)
         self.buffer.actions.append(selected_action.action)
