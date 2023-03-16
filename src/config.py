@@ -9,7 +9,6 @@ class Config:
     train: bool = False
     test: bool = False
     render: bool = False
-    cpu: bool = False
     seed: int = 42
 
     env: str = 'MountainCar-v0'

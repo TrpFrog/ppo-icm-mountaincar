@@ -1,4 +1,3 @@
-import torch
 import transformers
 
 from src.config import Config
@@ -11,10 +10,7 @@ if __name__ == '__main__':
     config = Config.from_args()
     transformers.set_seed(config.seed)
 
-    # Set device globally
-    device = 'cpu' if config.cpu else utils.get_device()
-    torch.set_default_device(device)
-    print(f'Using device: {device}')
+    print(f'Using device: {utils.get_device()}')
 
     if config.train:
         train(config)

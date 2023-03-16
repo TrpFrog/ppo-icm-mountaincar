@@ -47,7 +47,7 @@ def train(config: Config):
             curiosity = None
             print('Curiosity disabled')
 
-        agent = DiscretePPO(params=agent_params, curiosity=curiosity)
+        agent = DiscretePPO(params=agent_params, curiosity=curiosity).to(device)
         agent = typing.cast(DiscretePPO, torch.compile(agent))
 
         wandb_config = dataclasses.asdict(agent_params)
@@ -69,13 +69,13 @@ def train(config: Config):
                     if config.render:
                         env.render()
                     # convert obs to tensor
-                    obs = torch.from_numpy(obs).float()
+                    obs = torch.from_numpy(obs).float().to(device)
                     action = agent.select_action(obs)
 
                     obs, reward, terminated, truncated, info = env.step(action)
                     agent.record_step(
                         reward=reward,
-                        next_state=torch.from_numpy(obs).float(),
+                        next_state=torch.from_numpy(obs).float().to(device),
                         is_terminal=terminated
                     )
 

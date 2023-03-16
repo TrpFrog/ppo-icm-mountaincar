@@ -209,9 +209,9 @@ class PPO(nn.Module):
         return stacked
 
     def to(self, device: torch.device | str):
-        super()
+        super().to(device)
         self.device = device
-        self.policy
+        self.policy.to(device)
         self.policy.device = device
         return self
 
