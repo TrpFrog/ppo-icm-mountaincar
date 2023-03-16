@@ -27,7 +27,7 @@ def evaluate(config: Config):
             evaluation_batch_size=config.batch_size,
         )
 
-        agent = DiscretePPO(params=agent_params).to(device)
+        agent = DiscretePPO(params=agent_params)
 
         agent.load_state_dict(torch.load('ppo_discrete.pth'), strict=False)
 
@@ -38,7 +38,7 @@ def evaluate(config: Config):
                 if config.render:
                     env.render()
                 # convert obs to tensor
-                obs = torch.from_numpy(obs).float().to(device)
+                obs = torch.from_numpy(obs).float()
                 action = agent.select_action(obs, greedy=True)
                 obs, reward, terminated, truncated, info = env.step(action)
 

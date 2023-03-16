@@ -208,7 +208,7 @@ class ContinuousPPOActorCritic(PPOActorCritic):
         self.action_var = torch.full(
             (self.params.action_dim,),
             new_action_std ** 2
-        ).to(device)
+        )
 
     def act(self, state: Tensor, greedy: bool = False) -> SelectedAction:
         action_mean = self.actor(state).softmax(dim=-1)
@@ -236,7 +236,7 @@ class ContinuousPPOActorCritic(PPOActorCritic):
         assert action_mean.size(-1) == self.params.action_dim
 
         action_var = self.action_var.expand_as(action_mean)
-        cov_mat = torch.diag_embed(action_var).to(device)
+        cov_mat = torch.diag_embed(action_var)
         dist = torch.distributions.MultivariateNormal(action_mean, cov_mat)
 
         # For Single Action Environments.
