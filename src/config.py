@@ -10,6 +10,7 @@ class Config:
     test: bool = False
     render: bool = False
     seed: int = 42
+    name: str = ''
 
     env: str = 'MountainCar-v0'
     disable_curiosity: bool = False
@@ -20,9 +21,9 @@ class Config:
     gamma: float = 0.99
     k_epochs: int = 20
     eps_clip: float = 0.2
-    lr_actor: float = 0.0001
-    lr_critic: float = 0.0003
-    lr_curiosity: float = 0.0001
+    lr_actor: float = 0.001
+    lr_critic: float = 0.003
+    lr_curiosity: float = 0.001
 
     batch_size: int = 32
     buffer_update_size: int = 2048

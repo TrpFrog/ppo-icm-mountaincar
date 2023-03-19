@@ -10,7 +10,7 @@ class Curiosity(nn.Module):
     def loss(self, policy_loss: Tensor, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
         raise NotImplementedError
 
-    def reward(self, accum_reward: Tensor, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
+    def reward(self, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
         raise NotImplementedError
 
 
@@ -18,8 +18,8 @@ class NoCuriosity(Curiosity):
     def loss(self, policy_loss: Tensor, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
         return policy_loss
 
-    def reward(self, accum_reward: Tensor, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
-        return accum_reward.detach()
+    def reward(self, state: Tensor, action: Tensor, next_state: Tensor) -> Tensor:
+        return torch.zeros_like(action).detach()
 
 
 class ICMFeatureModel(nn.Sequential):
@@ -157,11 +157,18 @@ class DiscreteICM(Curiosity):
 
         return self.policy_loss_weight * policy_loss + loss
 
+    @torch.inference_mode()
     def reward(self,
-               accum_reward: Tensor,
                state: Tensor,
                action: Tensor,
                next_state: Tensor) -> Tensor:
+
+        if state.dim() == 1:
+            state = state.unsqueeze(0)
+        if next_state.dim() == 1:
+            next_state = next_state.unsqueeze(0)
+
+        assert state.size(0) == next_state.size(0) == action.size(0)
 
         latent_state = self.feature_model(state)
         latent_next_state = self.feature_model(next_state)
@@ -171,9 +178,7 @@ class DiscreteICM(Curiosity):
         )
 
         intrinsic_reward = 0.5 * self.reward_mse(predicted_next_state, latent_next_state)
-        intrinsic_reward = torch.sqrt(intrinsic_reward.sum(dim=-1))
+        intrinsic_reward = self.reward_scale * torch.sqrt(intrinsic_reward.sum(dim=-1))
 
-        assert accum_reward.shape == intrinsic_reward.shape
-        self.info_reward = self.reward_scale * intrinsic_reward.mean().item()
-
-        return (accum_reward + self.reward_scale * intrinsic_reward).detach()
+        assert intrinsic_reward.dim() == 1 and intrinsic_reward.size(0) == state.size(0)
+        return intrinsic_reward

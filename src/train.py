@@ -5,6 +5,7 @@ import numpy as np
 import typing
 import wandb
 import torch
+from torch import Tensor
 from tqdm import trange
 
 from src.config import Config
@@ -41,6 +42,7 @@ def train(config: Config):
             reward_scale=config.icm_eta,
             policy_loss_weight=config.icm_lambda,
             loss_scale=config.icm_beta,
+            hidden_size=64,
         )
 
         if config.disable_curiosity:
@@ -58,25 +60,28 @@ def train(config: Config):
 
         wandb.init(
             project='ppo-test-cartpole',
+            name=config.name or None,
             config=wandb_config
         )
 
         try:
             for i in range(episodes):
                 obs, info = env.reset()
+                obs: Tensor = torch.from_numpy(obs).float().to(device)
 
                 for t in trange(max_every_step, desc=f'Playing episode {i}'):
                     if config.render:
                         env.render()
                     # convert obs to tensor
-                    obs = torch.from_numpy(obs).float().to(device)
                     action = agent.select_action(obs)
 
                     obs, reward, terminated, truncated, info = env.step(action)
+                    obs = torch.from_numpy(obs).float().to(device)
+
                     agent.record_step(
                         reward=reward,
-                        next_state=torch.from_numpy(obs).float().to(device),
-                        is_terminal=terminated
+                        next_state=obs,
+                        is_terminal=terminated,
                     )
 
                     done = terminated or t == max_every_step - 1
@@ -87,6 +92,7 @@ def train(config: Config):
                         break
 
                 reward_sum = np.sum(agent.buffer.rewards[-(t + 1):])
+                cur_reward_sum = np.sum(agent.buffer.rewards_with_curiosity[-(t + 1):])
 
                 if config.env == 'MountainCar-v0':
                     max_x, max_v = torch.stack(agent.buffer.states[-(t + 1):], dim=0).max(dim=0).values
@@ -100,8 +106,9 @@ def train(config: Config):
                 print(info)
 
                 wandb.log(info)
-                print(f'Episode {i} finished after {t + 1} time steps')
+                print(f'Episode {i} finished after {t + 1} time steps '
+                      f'with reward {reward_sum:.2f} (with curiosity {cur_reward_sum:.2f}))')
         finally:
             # save parameters
-            torch.save(agent.state_dict(), 'ppo_discrete.pth')
+            torch.save(agent.state_dict(), f'ppo_{config.name}.pth')
 

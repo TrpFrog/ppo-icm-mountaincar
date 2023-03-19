@@ -30,6 +30,7 @@ class RolloutBuffer:
         self.next_states = []
         self.log_probs = []
         self.rewards = []
+        self.rewards_with_curiosity = []
         self.is_terminals = []
 
     def clear(self):
@@ -38,6 +39,7 @@ class RolloutBuffer:
         del self.next_states[:]
         del self.log_probs[:]
         del self.rewards[:]
+        del self.rewards_with_curiosity[:]
         del self.is_terminals[:]
 
 
@@ -190,6 +192,14 @@ class PPO(nn.Module):
         self.buffer.next_states.append(next_state)
         self.buffer.is_terminals.append(is_terminal)
 
+        curiosity_reward = self.curiosity.reward(
+            state=self.buffer.states[-1],
+            action=self.buffer.actions[-1],
+            next_state=next_state
+        ).item()
+
+        self.buffer.rewards_with_curiosity.append(reward + (curiosity_reward or 0.0))
+
     def batchify_state_memory(self, states: list) -> Tensor:
         stacked = torch.stack(states, dim=0)
         while stacked.size(0) <= 1 and stacked.dim() > 2:  # (batch_size, dim)
@@ -221,7 +231,8 @@ class PPO(nn.Module):
         current_discounted_reward = 0
 
         # Calculate discounted reward
-        for reward, is_terminal in zip(reversed(self.buffer.rewards), reversed(self.buffer.is_terminals)):
+        for reward, is_terminal in zip(reversed(self.buffer.rewards_with_curiosity),
+                                       reversed(self.buffer.is_terminals)):
             if is_terminal:
                 current_discounted_reward = reward
             else:
@@ -275,19 +286,11 @@ class PPO(nn.Module):
             for s_old, s_next_old, a_old, acc_reward, log_p_old in tqdm_iter:
                 evaluated = self.policy.evaluate(s_old, a_old)
 
-                # Add curiosity reward to the accumulated reward
-                acc_reward_with_curiosity = self.curiosity.reward(
-                    accum_reward=acc_reward,
-                    state=s_old,
-                    next_state=s_next_old,
-                    action=a_old,
-                )
-
                 # Calculate PPO loss
                 ppo_loss = self.ppo_loss(
                     old_log_prob=log_p_old,
                     log_prob=evaluated.action_log_probs,
-                    discounted_reward_sum=acc_reward_with_curiosity.flatten(),
+                    discounted_reward_sum=acc_reward.flatten(),
                     state_value=evaluated.state_values.flatten(),
                     dist_entropy=evaluated.dist_entropy,
                 )
@@ -309,8 +312,7 @@ class PPO(nn.Module):
                 ppo_losses.append(ppo_loss.item())
                 if hasattr(self.curiosity, 'latest_info'):
                     curiosity_losses.append(self.curiosity.latest_info['loss'])
-                    curiosity_reward.append(self.curiosity.latest_info['reward'])
-                total_reward.append(acc_reward_with_curiosity.mean().item())
+                total_reward.append(acc_reward.mean().item())
 
         # clear buffer
         self.buffer.clear()
