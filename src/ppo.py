@@ -321,8 +321,6 @@ class PPO(nn.Module):
         return {
             "ppo_loss": np.mean(ppo_losses),
             "curiosity_loss": np.mean(curiosity_losses) if len(curiosity_losses) > 0 else 0,
-            "curiosity_reward": np.mean(curiosity_reward) if len(curiosity_reward) > 0 else 0,
-            "total_reward": np.mean(total_reward),
         }
 
 

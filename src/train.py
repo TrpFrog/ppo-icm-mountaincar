@@ -21,9 +21,7 @@ def train(config: Config):
     with gym.make(config.env, render_mode=render_mode) as env:
 
         episodes = config.max_episodes
-        max_every_step = config.max_episode_length
-        if max_every_step <= 0:
-            max_every_step = env.spec.max_episode_steps
+        max_every_step = env.spec.max_episode_steps
 
         agent_params = DiscretePPO.Params(
             gamma_discount=config.gamma,
@@ -54,16 +52,10 @@ def train(config: Config):
             agent = torch.compile(agent)
             agent = typing.cast(DiscretePPO, agent)
 
-        wandb_config = dataclasses.asdict(agent_params)
-        wandb_config.update({
-            'episodes': episodes,
-            'max_every_step': max_every_step,
-        })
-
         wandb.init(
             project='ppo-test-cartpole',
             name=config.name or None,
-            config=wandb_config
+            config=config.to_dict()
         )
 
         try:
@@ -109,7 +101,9 @@ def train(config: Config):
                 if len(agent.buffer.rewards) > config.buffer_update_size:
                     info = agent.update()
 
-                info.update({'reward_sum': reward_sum})
+                info.update({'total_rewards': cur_reward_sum})
+                info.update({'steps': t + 1})
+
                 print(info)
 
                 wandb.log(info)
