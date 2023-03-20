@@ -53,7 +53,8 @@ def train(config: Config):
             agent = typing.cast(DiscretePPO, agent)
 
         wandb.init(
-            project='ppo-test-cartpole',
+            project='PPO-ICM-MountainCar',
+            group=config.group or None,
             name=config.name or None,
             config=config.to_dict()
         )

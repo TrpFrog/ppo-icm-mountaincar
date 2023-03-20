@@ -10,6 +10,7 @@ class Config:
     seed: int = config(default=42, help='random seed')
     name: str = config(default='', help='name of the run, used for wandb and model saving')
     env: str = 'MountainCar-v0'
+    group: str = config(default='', help='group name for wandb')
 
     # test
     path: str = config(default='', help='path to model to test')
