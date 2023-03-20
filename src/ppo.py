@@ -280,6 +280,7 @@ class PPO(nn.Module):
         total_reward = []
 
         # Optimize policy for K epochs
+        self.train()
         for epoch in tqdm.trange(self.params.k_epochs, desc="Optimizing policy", leave=False):
             epoch_desc = f"Epoch {epoch}/{self.params.k_epochs}"
             tqdm_iter = tqdm.tqdm(zip(*batched), total=len(batched[0]), desc=epoch_desc)
@@ -378,6 +379,7 @@ class ContinuousPPO(PPO):
         self.set_action_std(self.action_std)
 
     def select_action(self, state) -> float:
+        self.eval()
         with torch.inference_mode():
             state = torch.FloatTensor(state).to(self.device)
             selected_action = self.policy_old.act(state)
@@ -416,6 +418,7 @@ class DiscretePPO(PPO):
                          curiosity=curiosity)
 
     def select_action(self, state: Tensor, greedy: bool = False) -> int:
+        self.eval()
         with torch.inference_mode():
             selected_action = self.policy.act(state.unsqueeze(0), greedy=greedy)
 

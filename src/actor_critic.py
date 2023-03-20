@@ -153,6 +153,7 @@ class DiscretePPOActorCritic(PPOActorCritic):
         )
 
     def evaluate(self, state: Tensor, action: Tensor) -> EvaluationResult:
+        self.train()
         action_logits = self.actor(state)
         dist = torch.distributions.Categorical(logits=action_logits)
 
