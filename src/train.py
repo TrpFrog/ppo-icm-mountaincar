@@ -78,15 +78,20 @@ def train(config: Config):
                     obs, reward, terminated, truncated, info = env.step(action)
                     obs = torch.from_numpy(obs).float().to(device)
 
+                    if truncated:
+                        # If the episode is truncated (reach the max step),
+                        # it adds a negative reward to the last step.
+                        reward += -100
+
+                    done = terminated or truncated
+
+                    # In record_step(),
+                    # the curiosity reward is automatically calc and add to the reward.
                     agent.record_step(
                         reward=reward,
                         next_state=obs,
-                        is_terminal=terminated,
+                        is_terminal=done,
                     )
-
-                    done = terminated or t == max_every_step - 1
-                    if config.max_episode_length is None:
-                        done = done or truncated
 
                     if done:
                         break
@@ -97,7 +102,7 @@ def train(config: Config):
                 if config.env == 'MountainCar-v0':
                     max_x, max_v = torch.stack(agent.buffer.states[-(t + 1):], dim=0).max(dim=0).values
                     max_v, max_x = max_v.item(), max_x.item()
-                    print(f'{max_v = :.2f} {max_x = :.2f}')
+                    print(f'{max_v = :.2f} {max_x = :.2f} (goal: x = 0.5)')
 
                 if len(agent.buffer.rewards) > config.buffer_update_size:
                     info = agent.update()
