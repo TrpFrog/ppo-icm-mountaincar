@@ -11,7 +11,7 @@ device = utils.get_device()
 
 @torch.inference_mode()
 def evaluate(config: Config):
-    render_mode = 'human' if config.render else None
+    render_mode = 'human'
     with gym.make(config.env, render_mode=render_mode) as env:
         episodes = config.max_episodes
         max_every_step = env.spec.max_episode_steps
@@ -29,7 +29,7 @@ def evaluate(config: Config):
 
         agent = DiscretePPO(params=agent_params).to(device)
 
-        agent.load_state_dict(torch.load('ppo_discrete.pth'), strict=False)
+        agent.load_state_dict(torch.load(config.path), strict=False)
 
         for i in range(episodes):
             obs, info = env.reset()

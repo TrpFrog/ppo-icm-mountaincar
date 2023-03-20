@@ -1,5 +1,3 @@
-from typing import Optional
-
 import classopt
 
 
@@ -11,11 +9,14 @@ class Config:
     render: bool = False
     seed: int = 42
     name: str = ''
-
     env: str = 'MountainCar-v0'
+
+    # test
+    path: str = ''
+
+    # train
     disable_curiosity: bool = False
     max_episodes: int = 10000
-    max_episode_length: int = 200
 
     # hyperparameters
     gamma: float = 0.99
