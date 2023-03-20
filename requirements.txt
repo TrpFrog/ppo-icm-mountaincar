@@ -1,0 +1,7 @@
+classopt==0.2.1
+gym==0.26.2
+numpy==1.23.5
+torch==2.0.0
+tqdm==4.65.0
+transformers==4.27.0
+wandb==0.14.0
