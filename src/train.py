@@ -50,7 +50,9 @@ def train(config: Config):
             print('Curiosity disabled')
 
         agent = DiscretePPO(params=agent_params, curiosity=curiosity).to(device)
-        agent = typing.cast(DiscretePPO, torch.compile(agent))
+        if hasattr(torch, 'compile'):
+            agent = torch.compile(agent)
+            agent = typing.cast(DiscretePPO, agent)
 
         wandb_config = dataclasses.asdict(agent_params)
         wandb_config.update({
@@ -81,7 +83,7 @@ def train(config: Config):
                     if truncated:
                         # If the episode is truncated (reach the max step),
                         # it adds a negative reward to the last step.
-                        reward += -100
+                        reward += config.truncated_negative_reward
 
                     done = terminated or truncated
 
@@ -115,5 +117,5 @@ def train(config: Config):
                       f'with reward {reward_sum:.2f} (with curiosity {cur_reward_sum:.2f}))')
         finally:
             # save parameters
-            torch.save(agent.state_dict(), f'ppo_{config.name}.pth')
+            torch.save(agent.state_dict(), f'{config.name}.pth')
 
