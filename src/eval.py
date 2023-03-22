@@ -1,6 +1,7 @@
 import gym
 import torch
 import tqdm
+import typing
 
 from src.config import Config
 from src.ppo import DiscretePPO
@@ -28,8 +29,13 @@ def evaluate(config: Config):
         )
 
         agent = DiscretePPO(params=agent_params).to(device)
+        agent = torch.compile(agent)
+        agent = typing.cast(DiscretePPO, agent)
 
-        agent.load_state_dict(torch.load(config.path), strict=False)
+        agent.load_state_dict(
+            torch.load(config.path, map_location=device),
+            strict=False
+        )
 
         for i in range(episodes):
             obs, info = env.reset()
