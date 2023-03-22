@@ -177,8 +177,8 @@ class DiscreteICM(Curiosity):
             action=action.flatten()
         )
 
-        intrinsic_reward = 0.5 * self.reward_mse(predicted_next_state, latent_next_state)
-        intrinsic_reward = self.reward_scale * torch.sqrt(intrinsic_reward.sum(dim=-1))
+        squared_error = self.reward_mse(predicted_next_state, latent_next_state)
+        intrinsic_reward = self.reward_scale * 0.5 * squared_error.sum(dim=-1)
 
         assert intrinsic_reward.dim() == 1 and intrinsic_reward.size(0) == state.size(0)
         return intrinsic_reward
