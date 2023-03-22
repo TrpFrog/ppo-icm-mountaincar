@@ -1,7 +1,10 @@
+from functools import lru_cache
+
 import torch
 from torch import Tensor
 
 
+@lru_cache(maxsize=1)
 def get_device():
     # return 'cuda' if torch.cuda.is_available() else 'cpu'
     if torch.backends.mps.is_available():

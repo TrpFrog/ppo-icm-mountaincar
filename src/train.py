@@ -32,6 +32,7 @@ def train(config: Config):
             lr_actor=config.lr_actor,
             lr_critic=config.lr_critic,
             evaluation_batch_size=config.batch_size,
+            reward_scaling=config.reward_scaling,
         )
 
         curiosity = DiscreteICM(
@@ -97,10 +98,10 @@ def train(config: Config):
                 if config.env == 'MountainCar-v0':
                     max_x, max_v = torch.stack(agent.buffer.states[-(t + 1):], dim=0).max(dim=0).values
                     max_v, max_x = max_v.item(), max_x.item()
-                    print(f'{max_v = :.2f} {max_x = :.2f} (goal: x = 0.5)')
+                    info.update({'max_v': max_v, 'max_x': max_x})
 
                 if len(agent.buffer.rewards) > config.buffer_update_size:
-                    info = agent.update()
+                    info.update(agent.update())
 
                 info.update({'total_rewards': cur_reward_sum})
                 info.update({'steps': t + 1})

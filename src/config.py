@@ -27,9 +27,10 @@ class Config:
     lr_actor: float = config(default=0.001, help='learning rate for actor')
     lr_critic: float = config(default=0.003, help='learning rate for critic')
     lr_curiosity: float = config(default=0.001, help='learning rate for ICM')
+    reward_scaling: bool = config(default=False, help='scale reward in PPO')
 
-    batch_size: int = config(default=32, help='batch size for PPO')
-    buffer_update_size: int = config(default=2048, help='steps to update buffer')
+    batch_size: int = config(default=64, help='batch size for PPO')
+    buffer_update_size: int = config(default=4096, help='steps to update buffer')
 
     icm_eta: float = config(default=0.01, help='reward scale for ICM')
     icm_lambda: float = config(default=0.1, help='policy loss weight for ICM')
