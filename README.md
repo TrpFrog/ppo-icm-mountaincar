@@ -1,4 +1,4 @@
-# drl-spring-final
+# ppo-icm-mountaincar
 
 このリポジトリは「DRLスプリングセミナー2023」の最終課題のリポジトリです。
 
