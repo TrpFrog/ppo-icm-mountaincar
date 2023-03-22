@@ -46,13 +46,11 @@ python -m src --test --path=PATH_TO_MODEL
 
 `PATH_TO_MODEL` として選択可能な学習済みモデルは以下の通りです。
 
-  - `./models/random.pth`: ランダム初期値のモデル
   - `./models/ppo-only.pth`: PPO のみで学習したモデル
-  - `./models/ppo-icm.pth`: PPO + ICM で学習したモデル
-  - `./models/ppo-icm-pen.pth`: PPO + ICM で学習 + ペナルティを加えたモデル
-    - ペナルティ: 200 ステップ経過時点でゴールしていない場合に負の報酬 -100 を与える
+  - `./models/ppo-icm-16.pth`: PPO + ICM で学習したモデル ( $\eta = 16$ )
+  - `./models/ppo-icm-32.pth`: PPO + ICM で学習したモデル ( $\eta = 32$ )
 
-`ppo-only`, `ppo-icm`, `ppo-icm-pen` の学習過程は以下のサイトで確認できます。
+`ppo-only`, `ppo-icm-16`, `ppo-icm-32` の学習過程は以下のサイトで確認できます。
 
 https://wandb.ai/trpfrog/PPO-ICM-MountainCar
 
